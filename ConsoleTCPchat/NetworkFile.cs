@@ -3,12 +3,13 @@
     public class NetworkFile
     {
         internal string Filename { get; }
-        internal byte[] Data { get; }
 
-        public NetworkFile(string filename, byte[] data)
+        internal int FileSize { get; }
+
+        public NetworkFile(string filename, int fileSize)
         {
             Filename = filename;
-            Data = data;
+            FileSize = fileSize;
         }
     }
 }

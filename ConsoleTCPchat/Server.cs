@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -12,6 +13,7 @@ namespace ConsoleTCPchat
     {
         private int serverPort = 8888;
         private List<Client> _clients;
+        private int _bufferSize = 2048;
 
         public void AddConnection(Client client)
         {
@@ -58,18 +60,35 @@ namespace ConsoleTCPchat
                 case Message.MessageType.Binary:
                     SendFileMessage(message, client);
                     break;
+                case Message.MessageType.Image:
+                    SendFileMessage(message, client);
+                    break;
             }   
         }
 
         void SendFileMessage(Message message, Client client)
         {
-            byte[] protocolData = {(byte) Message.MessageType.Binary, (byte) (message.Username.Length * 2)};
+            byte[] protocolData = {(byte) message.Type, (byte) (message.Username.Length * 2)};
             client.Stream.Write(protocolData, 0, 2);
             client.Stream.Write(Encoding.Unicode.GetBytes(message.Username), 0, protocolData[1]);
-            byte[] bytes = BitConverter.GetBytes(message.File.Filename.Length * 2);
-            client.Stream.Write(bytes, 0, 4); 
+            
+            byte[] bytesLength = BitConverter.GetBytes(message.File.Filename.Length * 2);
+            client.Stream.Write(bytesLength, 0, 4);
             client.Stream.Write(Encoding.Unicode.GetBytes(message.File.Filename), 0, message.File.Filename.Length * 2);
-            client.Stream.Write(message.File.Data, 0, message.File.Data.Length);
+            
+            byte[] fileSizeBytes = BitConverter.GetBytes(message.File.FileSize);
+            client.Stream.Write(fileSizeBytes, 0, 4);
+            
+            using (FileStream file = File.Open(@".\Downloads\" + message.File.Filename, FileMode.Open))
+            {
+                byte[] buffer = new byte[_bufferSize];
+                do
+                {
+                    int length = file.Read(buffer, 0, _bufferSize);
+                    client.Stream.Write(buffer, 0, length);
+                } while (file.Position != file.Length);
+            }
+            
         }
 
         void SendTextMessage(Message message, Client client)
@@ -82,6 +101,12 @@ namespace ConsoleTCPchat
 
         public Server()
         {
+            _clients = new List<Client>();
+        }
+        
+        public Server(int port)
+        {
+            serverPort = port;
             _clients = new List<Client>();
         }
     }
